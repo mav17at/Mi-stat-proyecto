@@ -1,0 +1,244 @@
+---
+title: "semana 9"
+author: "G6"
+format: html
+editor: visual
+integrantes: 
+"Alarcon Tacson, Maria Victoria
+Calderon Luque, Naomy Alexandra
+De la Rosa Olachea, Randa Rosario
+Muñante Quispe, Enith Margoryt"
+---
+
+## Cargar e instalar los datos
+
+```{r}
+install.packages("car") # Para la prueba de Levene
+```
+
+```{r}
+library(tidyverse)
+library(here)
+library(rio)
+library(gtsummary)
+library(car)
+```
+
+# Cargando los datos
+
+```{r}
+conoc_actit_factor_cancer_cervical <-import(here("data","conoc_actit_factor_cancer_cervical"))
+```
+
+1.  **Regresión lineal simple**
+
+```{r}
+conoc_actit_factor_cancer_cervical|>
+  ggplot(aes(x= parejas_sex)) +
+  geom_histogram(
+    color = "white",
+  ) +
+  labs(y= "frecuencia",
+       x="parejas_sex") +
+  geom_vline(xintercept = mean(conoc_actit_factor_cancer_cervical$parejas_sex, na.rm =TRUE),
+             color="darkred", size= 1.5)
+```
+
+En estos datos el promedio de las parejas sexuales es:
+
+```{r}
+mean(conoc_actit_factor_cancer_cervical$parejas_sex, na.rm = TRUE)
+```
+
+## 1.2 Notación en el método de regresión lineal simple
+
+```{r}
+plot(parejas_sex ~ num_hijos , data =conoc_actit_factor_cancer_cervical,
+     col= "gray", 
+     ylab= "num_hijos",
+     xlab="conoc_actit_factor_cancer_cervical",
+     las= 1,
+     pch= 20,
+     font.lab= 2, font.axis= 2)
+abline(lm(parejas_sex ~ num_hijos , data = conoc_actit_factor_cancer_cervical), lwd = 2, col = "darkred")
+```
+
+## 1.3 ajustando el modelo de regresion lineal simple par nuestro problema
+
+```{r}
+modelo_ejemplo = lm(parejas_sex ~ num_hijos, data=conoc_actit_factor_cancer_cervical )
+```
+
+para ver los resultados, usamos la funcion summary() y dentro, el objeto modelo_ejemplo.
+
+```{r}
+summary(modelo_ejemplo)
+```
+
+## 1.4 Interpretando los resultados
+
+la sección Coefficients del resultado:
+
+```{r}
+summary(modelo_ejemplo)$coef
+```
+
+## 1.5 ¿Cómo reportar los resultados del ajuste del modelo de regresión lineal simple?
+
+```{r}
+theme_gtsummary_language("es")
+
+tabla_reporte <- modelo_ejemplo |>
+  tbl_regression(intercept = T,
+                 estimate_fun = function(x) style_sigfig(x, digits = 4),
+                 pvalue_fun = function(x) style_pvalue(x, digits = 3),
+                 label = list(num_hijos ~ "num_hijos")) |>
+  modify_caption("regresión de parejas sexuales en función a los numeros de hijos")
+tabla_reporte
+```
+
+**Exportamos la tabla**
+
+```{r}
+tabla_reporte |>
+  as_flex_table() |>
+  flextable::save_as_docx(path = "tabla_reporte.docx")
+```
+
+# 2 Prueba de t de Student para muestras independientes
+
+## 2.1 ¿Cuándo usar la prueba t de Student para muestras independientes?
+
+## 2.2 Sobre los datos para esta práctica
+
+## 2.3 Resumen y visualización
+
+```{r}
+group_by(conoc_actit_factor_cancer_cervical, antec_ets) |> 
+  summarise(
+    count = n(),
+    mean = mean(edad_relacion_sexual, na.rm = TRUE),
+    sd = sd(edad_relacion_sexual, na.rm = TRUE)
+  )
+```
+
+visualización
+
+```{r}
+conoc_actit_factor_cancer_cervical |>  
+  filter(!is.na(antec_ets)& !is.na(edad_relacion_sexual))  |> 
+  ggplot(aes(y = edad_relacion_sexual, x = antec_ets)) +
+  geom_boxplot() +
+  labs(y = "edad_relacion_sexual", x = "antec_ets")
+```
+
+## 2.4 Pruebas preliminares para evaluar los supuestos de la prueba t de Student
+
+Supuesto 1:
+
+```{r}
+conoc_actit_factor_cancer_cervical |> 
+  filter(antec_ets == "si") |> 
+  summarise(shapiro = list(shapiro.test(edad_relacion_sexual))) |> 
+  pull(shapiro)
+```
+
+```{r}
+conoc_actit_factor_cancer_cervical |> 
+  filter(antec_ets == "no") |> 
+  summarise(shapiro = list(shapiro.test(edad_relacion_sexual))) |> 
+  pull(shapiro)
+```
+
+Supuesto 2:
+
+```{r}
+var.test(edad_relacion_sexual ~ antec_ets, data = conoc_actit_factor_cancer_cervical)
+```
+
+## 2.5 Realizamos la prueba t para nuestros datos.
+
+```{r}
+t.test(edad_relacion_sexual ~ antec_ets, data = conoc_actit_factor_cancer_cervical, var.equal = TRUE)
+```
+
+# 3 Análisis de Varianza (ANOVA)
+
+## 3.1 ¿Cuándo usar el ANOVA de una vía?
+
+## 3.2 Sobre los datos para esta práctica
+
+## 3.3 Resumen y visualización
+
+```{r}
+group_by(conoc_actit_factor_cancer_cervical, met_anticoncep) |> 
+  summarise(
+    count = n(),
+    mean = mean(edad, na.rm = TRUE),
+    sd = sd(edad, na.rm = TRUE),
+    min = min(edad, na.rm = TRUE),
+    max = max(edad, na.rm = TRUE)
+  )
+```
+
+visualización
+
+```{r}
+conoc_actit_factor_cancer_cervical |>  
+  filter(!is.na(met_anticoncep)& !is.na(edad))  |> 
+  ggplot(aes(y = edad, x = met_anticoncep)) +
+  geom_boxplot() +
+  labs(y = "edad", x = "antec_ets")
+```
+
+## 3.4 Pruebas preliminares para evaluar los supuestos del ANOVA
+
+```{r}
+conoc_actit_factor_cancer_cervical <- conoc_actit_factor_cancer_cervical |>
+    mutate(met_anticoncep = as.factor(met_anticoncep))
+```
+
+supuesto 1:
+
+```{r}
+conoc_actit_factor_cancer_cervical |> 
+  filter(met_anticoncep == "diu") |> 
+  summarise(shapiro = list(shapiro.test(edad))) |> 
+  pull(shapiro)
+```
+
+```{r}
+conoc_actit_factor_cancer_cervical |> 
+  filter(met_anticoncep == "ampolla de 3 meses") |> 
+  summarise(shapiro = list(shapiro.test(edad))) |> 
+  pull(shapiro)
+```
+
+```{r}
+conoc_actit_factor_cancer_cervical |> 
+  filter(met_anticoncep == "no uso") |> 
+  summarise(shapiro = list(shapiro.test(edad))) |> 
+  pull(shapiro)
+```
+
+Supuesto 2:
+
+```{r}
+leveneTest(edad ~ met_anticoncep, data = conoc_actit_factor_cancer_cervical)
+```
+
+## 3.5 Realizamos la prueba de ANOVA de una vía para nuestros datos.
+
+```{r}
+res_anova = aov(edad ~ met_anticoncep, data = conoc_actit_factor_cancer_cervical)
+```
+
+```{r}
+summary(res_anova)
+```
+
+Interpretando los resultados:
+
+```{r}
+TukeyHSD(res_aov)
+```
