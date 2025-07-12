@@ -1,0 +1,245 @@
+---
+title: "SEMANA12"
+Grupo: "G6"
+integrantes: "Alarcon Tacson, Maria Victoria"
+"Calderon Luque, Naomy Alexandra"
+"De la Rosa Olachea, Randa Rosario"
+"Muñante Quispe, Enith Margoryt"
+format: html
+editor: visual
+---
+##Cargar los paquetes
+```{r}
+install.packages("performance")
+```
+
+```{r}
+library(tidyverse)
+library(here)
+library(rio)
+library(gtsummary)
+library(car)
+library(survival)
+library(performance)
+```
+
+cargar data:
+```{r}
+conoc_actit_factor_cancer_cervical <- import(here("data", "conoc_actit_factor_cancer_cervical.csv"))
+```
+
+un vistazo a los datos:
+```{r}
+head(conoc_actit_factor_cancer_cervical)
+```
+#2.2 El análisis univariado
+```{r}
+conoc_actit_factor_cancer_cervical1 <-
+  conoc_actit_factor_cancer_cervical |>
+  mutate( antec_fam = relevel(as.factor(antec_fam), ref = "no"),
+    `estado civil` = relevel(as.factor(e_marital), ref = "soltera"),
+    practica = relevel(as.factor(practica), ref = "incorrecta")
+  ) |>
+  na.omit()
+```
+En este código se prepara una base de datos para el análisis univariado. Se convierten tres variables categóricas en factores (antec_fam, e_marital y practica) y se les asigna un nivel de referencia específico mediante relevel(), lo cual es esencial para interpretar correctamente los modelos estadísticos posteriores. Luego, se aplica na.omit() para eliminar los registros con datos faltantes, asegurando un análisis limpio y sin errores.
+
+```{r}
+tabla_reg_log_univ <- conoc_actit_factor_cancer_cervical1 |>
+  tbl_uvregression(
+    include = c(edad, e_marital, n_educacion, religion, etnia,
+                procedencia, ocupacion,antec_fam, edad_relacion_sexual,parejas_sex, num_hijos, met_anticoncep,antec_ets,actitud),
+    y = practica,
+    method = glm,
+    method.args = list(family = binomial),
+    exponentiate = TRUE,
+    conf.int = TRUE,
+    hide_n = TRUE,
+    add_estimate_to_reference_rows = FALSE,
+    pvalue_fun = ~ style_pvalue(.x, digits = 3),
+    estimate_fun = ~ style_number(.x, digits = 2),
+    label = list(
+      edad ~ "Edad (años)",
+      e_marital ~ "Estado civil",
+      n_educacion ~ "Nivel de educación",
+      religion ~ "religión",
+      etnia ~ "Etnia",
+      procedencia ~ "Procedencia",
+      ocupacion ~ "Ocupación",
+      antec_fam ~ "Antecedentes familiares de cáncer cervical",
+      edad_relacion_sexual ~ "Edad de inicio de relaciones sexuales",
+      parejas_sex ~ "Número de parejas sexuales",
+      num_hijos ~ "Número de hijos",
+      met_anticoncep ~ "Método anticonceptivo",
+      antec_ets ~ "Antecedentes de ETS",
+      actitud ~ "Actitud frente al cáncer cervical"
+    )
+  ) |>
+  bold_labels() |>
+  bold_p(t = 0.05) |>
+  modify_header(estimate = "**OR no ajustado**", p.value = "**Valor P**")
+```
+
+En la tabla vemos que realiza una regresión logística univariada para analizar los factores de riesgo asociados con el conocimiento y la actitud hacia el cáncer cervical.
+ 
+La variable dependiente (y) es practica (probablemente relacionada con la práctica de prevención del cáncer cervical). Las variables independientes (include) son varias características demográficas y de estilo de vida, incluyendo edad, estado civil, nivel de educación, religión, etnia, procedencia, ocupación, antecedentes familiares de cáncer cervical, edad de inicio de relaciones sexuales, número de parejas sexuales, número de hijos, método anticonceptivo, antecedentes de ETS y actitud hacia el cáncer cervical.
+ 
+El modelo utiliza una distribución binomial (family = binomial) ya que la variable dependiente probablemente es dicotómica (por ejemplo, si la práctica es correcta o incorrecta).  Las opciones de formato (add_estimate_to_reference_rows, pvalue_fun, estimate_fun, label) controlan la presentación de los resultados en la tabla, incluyendo los valores p y los coeficientes de regresión.  Finalmente, bold_labels y modify_header ajustan el formato de la tabla para resaltar valores estadísticamente significativos (p < 0.05).
+ 
+```{r}
+tabla_reg_log_univ
+```
+### 2.3 El análisis multivariado
+```{r}
+var_modelo = glm(
+  practica ~ edad + e_marital+ n_educacion+ religion+ etnia + procedencia+ ocupacion+antec_fam+ edad_relacion_sexual+parejas_sex+ num_hijos+ met_anticoncep+antec_ets+actitud,
+  data = conoc_actit_factor_cancer_cervical1,
+  family = binomial(link = "logit")
+  )
+```
+
+**Paso 2a. Realizamos la selección de variables** usando la técnica Eliminación hacia atrás (Backward elimination).
+
+```{r}
+multi_backward <- var_modelo |>
+  step(direction = "backward", trace = FALSE)
+```
+
+**Paso 2b. Realizamos la selección de variables** usando la técnica Selección hacia adelante (Forward selection).
+
+```{r}
+multi_forward <- var_modelo |>
+  step(direction = "forward", trace = FALSE)
+```
+
+**Paso 3c. Realizamos la selección de variables** usando la técnica Selección paso a paso (Stepwise selection).
+
+```{r}
+multi_stepwise <- var_modelo |>
+  step(direction = "both", trace = FALSE)
+```
+
+**Paso 3. Estimados el AIC para los modelos.**
+
+```{r}
+summary(multi_backward)
+```
+```{r}
+summary(multi_forward)
+```
+```{r}
+summary(multi_stepwise)
+```
+
+**2.4 Conclusión**
+Los análisis sugieren que existen múltiples factores demográficos, socioeconómicos y de comportamiento que influyen en la práctica de prevención del cáncer cervical, más allá de solo el número de hijos y la actitud.  Para comprender completamente estos factores y sus interacciones se requiere un modelo multivariado más complejo como se muestra en los cuadros 2 y 3.  El modelo más completo (cuadro 3) proporciona la información más rica para la toma de decisiones en intervenciones de salud pública.  Sin embargo, la significancia estadística de cada variable individual debe interpretarse con cautela, considerando la posible colinealidad entre predictores.
+
+### 2.5 Evaluación de colinealidad
+
+```{r}
+performance::check_collinearity(multi_backward, ci = NULL)
+```
+```{r}
+performance::check_collinearity(multi_forward, ci = NULL)
+```
+```{r}
+performance::check_collinearity(multi_stepwise, ci = NULL)
+```
+### **2.6 Conclusión**
+En los tres modelos evaluados (backward, forward y stepwise), la mayoría de las variables presentan baja multicolinealidad, con valores de VIF cercanos a 1 y tolerancia alta, lo que indica que no hay redundancia importante entre ellas. Esto es favorable para la estabilidad e interpretación de los modelos. No obstante, en el modelo forward se identificó una colinealidad moderada en la variable "ocupación", con un VIF de 8.41 y una tolerancia de 0.12, lo que podría afectar la precisión de las estimaciones. Por ello, se recomienda evaluar esta variable antes de incluirla en el modelo final.
+
+## 3 Reporte del análisis univariado y multivariado
+```{r}
+tabla_univ <- conoc_actit_factor_cancer_cervical1 |>
+  tbl_uvregression(
+    include = c(edad, e_marital, n_educacion, religion, 
+    etnia, procedencia, ocupacion, antec_fam,  
+    edad_relacion_sexual, parejas_sex, num_hijos, met_anticoncep,  
+    antec_ets, actitud),
+    y = practica,
+    method = glm,
+    method.args = list(family = binomial),
+    exponentiate = TRUE,
+    conf.int = TRUE,
+    hide_n = TRUE,
+    add_estimate_to_reference_rows = FALSE,
+    pvalue_fun = ~ style_pvalue(.x, digits = 3),
+    estimate_fun = ~ style_number(.x, digits = 2),
+    label = list(
+      edad ~ "Edad (años)",
+      e_marital ~ "Estado civil",
+      n_educacion ~ "Nivel de educación",
+      religion ~ "religión",
+      etnia ~ "Etnia",
+      procedencia ~ "Procedencia",
+      ocupacion ~ "Ocupación",
+      antec_fam ~ "Antecedentes familiares de cáncer cervical",
+      edad_relacion_sexual ~ "Edad de inicio de relaciones sexuales",
+      parejas_sex ~ "Número de parejas sexuales",
+      num_hijos ~ "Número de hijos",
+      met_anticoncep ~ "Método anticonceptivo",
+      antec_ets ~ "Antecedentes de ETS",
+      actitud ~ "Actitud frente al cáncer cervical"
+    )
+  ) |>
+  bold_labels() |>
+  bold_p(t = 0.05) |>
+  modify_header(estimate = "**OR**", p.value = "**Valor P**")
+```
+Este código R realiza un análisis univariado y multivariado de factores que influyen en la "práctica" (variable dependiente, probablemente relacionada con la prevención del cáncer cervical).  El análisis multivariado, usando regresión logística, permite evaluar simultáneamente el efecto de múltiples variables (edad, estado civil, educación, etc.) sobre la práctica, proporcionando una comprensión más completa y precisa que el análisis univariado.  La salida mostrará la significancia estadística y la magnitud del efecto de cada factor en el modelo multivariado, permitiendo identificar los predictores más importantes de la práctica de prevención.
+
+```{r}
+tabla_multi <- glm(
+  practica ~ edad + e_marital + n_educacion + religion + 
+    etnia + procedencia + ocupacion + antec_fam + 
+    edad_relacion_sexual + parejas_sex + num_hijos + met_anticoncep + 
+    antec_ets + actitud,
+  family = binomial(link = "logit"),
+  data = conoc_actit_factor_cancer_cervical1
+) |>
+  tbl_regression(
+    exponentiate = TRUE,
+    conf.int = TRUE,
+    pvalue_fun = ~ style_pvalue(.x, digits = 3),
+    estimate_fun = ~ style_number(.x, digits = 2),
+    label = list(
+      edad ~ "Edad (años)",
+      e_marital ~ "Estado civil",
+      n_educacion ~ "Nivel de educación",
+      religion ~ "religión",
+      etnia ~ "Etnia",
+      procedencia ~ "Procedencia",
+      ocupacion ~ "Ocupación",
+      antec_fam ~ "Antecedentes familiares de cáncer cervical",
+      edad_relacion_sexual ~ "Edad de inicio de relaciones sexuales",
+      parejas_sex ~ "Número de parejas sexuales",
+      num_hijos ~ "Número de hijos",
+      met_anticoncep ~ "Método anticonceptivo",
+      antec_ets ~ "Antecedentes de ETS",
+      actitud ~ "Actitud frente al cáncer cervical"
+    )
+  ) |>
+  bold_labels() |>
+  bold_p(t = 0.05) |>
+  modify_header(estimate = "**OR**", p.value = "**Valor P**")
+```
+Este código R ejecuta una regresión logística multivariada para determinar la influencia de diversos factores sociodemográficos, reproductivos y de salud (edad, estado civil, educación, religión, etnia, procedencia, ocupación, antecedentes familiares de cáncer cervical, edad de inicio de relaciones sexuales, número de parejas sexuales, número de hijos, método anticonceptivo, antecedentes de ETS y actitud) sobre una variable de "práctica" relacionada con la prevención del cáncer cervical.  El resultado mostrará la importancia relativa y la dirección del efecto de cada variable en la práctica, permitiendo identificar los factores más relevantes para diseñar estrategias de prevención.
+
+
+```{r}
+tabla_final <- 
+  tbl_merge(
+    list(tabla_univ, tabla_multi),
+    tab_spanner = c("**Univariado**", "**Multivariado**")
+  )
+```
+
+
+```{r}
+tabla_final
+```
+### **3.1 ¿Cómo interpretar?**
+
+En el modelo de regresión logística ajustado, el estado civil y la religión se asociaron de manera significativa con el desenlace evaluado. Ser soltera se relacionó con una menor probabilidad de presentar el desenlace, con una reducción del 72% en las odds frente a las mujeres casadas (OR = 0.28; IC95%: 0.07–0.95; p = 0.049). Por otro lado, no profesar ninguna religión se asoció con un aumento significativo en las odds de presentar el desenlace, siendo más de ocho veces mayor en comparación con quienes se identificaron como católicas (OR = 8.45; IC95%: 1.17–90.95; p = 0.046).
+
+

@@ -1,0 +1,244 @@
+---
+title: "semana11"
+Grupo: "6"
+author: "Alarcon Tacson, Maria Victoria"
+"Calderon Luque, Naomy Alexandra"
+"De la Rosa Olachea, Randa Rosario"
+"Muñante Quispe, Enith Margoryt"
+format: html
+editor: visual
+---
+
+```{r}
+install.packages("broom")
+install.packages("survival")
+install.packages("survminer")
+install.packages("ggsurvfit")
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(survival)
+library(survminer)
+library(gtsummary)
+library(broom)
+library(here)
+library(rio)
+library(ggsurvfit)
+```
+
+# 1. Estimaciones de supervivencia usando el método de Kaplan-Meier
+
+## 1.1 El dataset para este ejercicio
+
+cargando el dataset
+
+```{r}
+cancer_pancreas_ <- import(here("data", "cancer_pancreas_.csv"))
+```
+
+vistazo del dataset
+
+```{r}
+cancer_pancreas_ |> 
+  select(Sobrevida_meses,Metástasis, Sexo ) |> 
+  summary()
+```
+
+**Conclusión:** El conjunto de datos revela que se analizaron 100 pacientes con cáncer de páncreas, incluyendo información sobre su tiempo de sobrevida (en meses), presencia de metástasis y sexo. El tiempo de sobrevida varía entre 1 y 27 meses, con una mediana de 14.5 meses y una media de 14.56, lo cual indica una distribución relativamente simétrica.
+
+En cuanto a la variable Metástasis, se observa que el 64% de los casos presentan metástasis (valor medio = 0.64), mientras que el campo Sexo es de tipo carácter, lo que indica que la base está preparada para análisis estratificados por género. Este vistazo preliminar permite confirmar la consistencia y utilidad del dataset para realizar análisis de supervivencia robustos.
+
+## 1.2 El desenlace en el análisis de supervivencia
+
+```{r}
+Surv(cancer_pancreas_$Sobrevida_meses, cancer_pancreas_$Metástasis)
+```
+
+**Conclusión:** La salida de la función Surv() representa la estructura de datos necesaria para realizar el análisis de supervivencia. En este caso, se utilizó la variable Sobrevida_meses como tiempo de seguimiento y Metástasis como indicador del evento (1 = fallecimiento, 0 = censura). El objeto resultante contiene pares de valores que indican el tiempo observado y si el evento ocurrió, lo que permite a funciones como survfit() o coxph() interpretar correctamente los datos. Esta transformación es fundamental para los métodos de Kaplan-Meier y regresión de Cox, ya que establece la base del análisis de tiempo hasta el evento, respetando la censura presente en los datos.
+
+```{r}
+km = survfit(Surv(Sobrevida_meses,Metástasis) ~ 1, data = cancer_pancreas_ )
+
+```
+
+```{r}
+str(km)
+```
+
+## 1.3 Gráficos de Kaplan-Meier
+
+```{r}
+survfit2(Surv(Sobrevida_meses, Metástasis) ~ 1, data = cancer_pancreas_) |>  
+  ggsurvfit() +
+  labs(
+    x = "Días",
+    y = "Probabilidad de supervivencia global"
+  ) +
+  add_censor_mark()
+```
+
+**Conclusión:** El gráfico de Kaplan-Meier muestra que la curva desciende progresivamente con el tiempo, lo que indica una disminución constante en la probabilidad de supervivencia a medida que pasan los días. Se observa que la supervivencia global cae por debajo del 50% antes de los 25 días, lo cual evidencia un pronóstico severo para esta población. Además, los marcadores de censura presentes en la curva indican pacientes cuyo seguimiento fue interrumpido antes de presentar el evento.
+
+Esta representación visual refuerza la necesidad de atención clínica temprana y seguimiento riguroso en este tipo de casos.
+
+```{r}
+survfit2(Surv(Sobrevida_meses, Metástasis) ~ 1, data = cancer_pancreas_) |>  
+  ggsurvfit() +
+  labs(
+    x = "Días",
+    y = "Probabilidad de supervivencia global"
+  ) + 
+  add_censor_mark() +
+  add_confidence_interval() +
+  add_risktable()
+```
+
+**Conclusión:** La curva de Kaplan-Meier, incluye intervalos de confianza al 95%, representados por el área sombreada en gris, lo cual permite visualizar la incertidumbre estadística en las estimaciones de supervivencia global. A medida que transcurren los días, se observa una disminución constante en la probabilidad de supervivencia de los pacientes con cáncer de páncreas con metástasis. La presencia de los tramos sombreados amplía la interpretación al mostrar la variabilidad de la estimación, especialmente en los extremos de tiempo donde hay menos pacientes en riesgo. Además, la tabla de riesgo incorporada debajo del gráfico proporciona el número de individuos que permanecen bajo observación en cada intervalo, lo cual refuerza la interpretación clínica del descenso en la curva. En conjunto, esta visualización ofrece una perspectiva más precisa y confiable del pronóstico de los pacientes.1.4 Estimación de la supervivencia a x años.
+
+```{r}
+summary(survfit(Surv(Sobrevida_meses, Metástasis) ~ 1, data = cancer_pancreas_), times = 365.25)
+```
+
+```{r}
+survfit2(Surv(Sobrevida_meses, Metástasis) ~ 1, data = cancer_pancreas_) |>
+  ggsurvfit() +
+  labs(
+    x = "Días",
+    y = "Probabilidad de supervivencia global"
+  ) + 
+  add_confidence_interval() +
+  add_risktable() +
+  add_quantile(x_value = 365.25, linewidth = .7)
+```
+
+**Conclusión:** Este gráfico de Kaplan-Meier muestra la evolución de la probabilidad de supervivencia global en pacientes con metástasis de cáncer de páncreas, incluyendo intervalos de confianza al 95% y una marca específica a los 365.25 días (1 año). La línea vertical indica el punto donde se estima la probabilidad de supervivencia al completar un año de seguimiento. A esta altura, la curva muestra una probabilidad de supervivencia considerablemente reducida, lo que refleja el grave pronóstico en esta población.
+
+### 1.5 Estimación mediana del tiempo de supervivencia
+
+```{r}
+survfit(Surv(Sobrevida_meses, Metástasis) ~ 1, data = cancer_pancreas_)
+```
+
+La mediana de supervivencia corresponde a la probabilidad de supervivencia de 0.5. Para este dataset, la mediana es de 310 días. En el gráfico de Kaplan Meier
+
+```{r}
+survfit2(Surv(Sobrevida_meses, Metástasis) ~ 1, data = cancer_pancreas_) |>
+  ggsurvfit() +
+  labs(
+    x = "Días",
+    y = "Probabilidad de supervivencia global"
+  ) + 
+  add_confidence_interval() +
+  add_risktable() +
+  add_quantile(y_value = 0.5, linewidth = .7)
+```
+
+## ¿Cómo reportar?
+
+```{r}
+theme_gtsummary_language(language = "es")
+```
+
+```{r}
+survfit(Surv(Sobrevida_meses, Metástasis) ~ 1, data = cancer_pancreas_) %>%
+  tbl_survfit(
+    times = 365.25,
+    label_header = "**Supervivencia a 1 año (IC 95%)**"
+  )
+```
+
+```{r}
+survfit(Surv(Sobrevida_meses, Metástasis) ~ 1, data = cancer_pancreas_) |>  
+  tbl_survfit(
+    probs = 0.5,
+    label_header = "**Supervivencia a 1 año (IC 95%)**"
+  )
+```
+
+**Conclusión:** El análisis de supervivencia realizado con tbl_survfit() estimó la mediana del tiempo de supervivencia global en 18 días, con un intervalo de confianza del 95% entre 15 y 19 días.
+
+Esto significa que el 50% de los pacientes con cáncer de páncreas y metástasis fallecen antes de alcanzar los 18 días desde el inicio del seguimiento. Este resultado refleja un pronóstico extremadamente limitado y confirma la agresividad de la enfermedad en esta población. La precisión del intervalo sugiere que los datos están bien definidos para estimar la mediana, lo cual refuerza la utilidad clínica de este indicador para guiar decisiones médicas tempranas.
+
+## 1.6 Comparando tiempos de supervivencia entre dos grupos
+
+```{r}
+survdiff(Surv(Sobrevida_meses, Metástasis) ~ Sexo, data = cancer_pancreas_)
+```
+
+El siguiente gráfico de Kaplan-meier muestra el resultado de la prueba de log-rank.
+
+```{r}
+survfit2(Surv(Sobrevida_meses, Metástasis) ~ Sexo, data = cancer_pancreas_) |>
+  ggsurvfit() +
+  labs(
+    x = "Días",
+    y = "Supervivencia global"
+  ) + 
+  add_confidence_interval() +
+  add_risktable() +
+  add_pvalue(caption = "Log-rank {p.value}")
+```
+
+**Conclusión:** El gráfico de Kaplan-Meier estratificado por sexo permite comparar visualmente la supervivencia global entre pacientes masculinos y femeninos con cáncer de páncreas con metástasis.
+
+Las curvas de color muestran una tendencia similar en ambos grupos, y aunque a simple vista podría parecer que existe una leve diferencia, la prueba de log-rank arrojó un valor de p = 0.3, lo que indica que no hay una diferencia estadísticamente significativa en los tiempos de supervivencia entre hombres y mujeres.
+
+# 2 El modelo de regresión de Cox
+
+## 2.1 El dataset para este ejercicio
+
+```{r}
+diabetes_mellitus_final <- import(here("data", "diabetes_mellitus_final.csv"))
+```
+
+```{r}
+coxph(Surv(Tiempo_enfermedad_anios, Estado == "Fallecido") ~ Tipo_diabetes, data = diabetes_mellitus_final)
+```
+
+## 2.2 Interpretación y reporte
+
+```{r}
+coxph(Surv(Tiempo_enfermedad_anios, Estado == "Fallecido") ~ Tipo_diabetes, data = diabetes_mellitus_final) %>% 
+  tbl_regression(exp = TRUE) 
+```
+
+**Conclusión:** Se realizó un análisis de supervivencia utilizando un modelo de regresión de Cox para evaluar la asociación entre el tipo de diabetes y el riesgo de fallecimiento a lo largo del tiempo desde el diagnóstico. La diabetes gestacional se tomó como categoría de referencia, Los resultados mostraron que los pacientes con diabetes tipo 1 tuvieron un cociente de riesgos instantáneos (HR) de 1.02 (IC 95%: 0.54–1.93; p \> 0.9), mientras que los pacientes con diabetes tipo 2 tuvieron un HR de 0.84 (IC 95%: 0.41–1.70; p = 0.6). Ninguna de estas asociaciones fue estadísticamente significativa, ya que ambos intervalos de confianza incluyen el valor 1 y los valores p indican una alta probabilidad de que las diferencias observadas sean debidas al azar. Por lo tanto, no se encontró evidencia suficiente para afirmar que el tipo de diabetes influya significativamente en el riesgo de fallecer en esta cohorte.
+
+### 2.3 Reporte para multiple variables
+
+```{r}
+tabla_cox <- diabetes_mellitus_final |>
+  tbl_uvregression(
+    include = c(Sexo, HbA1c, HbA1c_basal, Edad, Glucosa, Escala_Wagner, Referido, Tipo_diabetes),
+    y = Surv(Tiempo_enfermedad_anios, Estado == "Fallecido"),
+    method = coxph,
+    exponentiate = TRUE,
+    conf.int = TRUE,
+    hide_n = TRUE,
+    add_estimate_to_reference_rows = FALSE,
+    pvalue_fun = ~ style_pvalue(.x, digits = 3),
+    estimate_fun = ~ style_number(.x, digits = 2),
+    label = list(
+      Sexo ~ "Sexo",
+      HbA1c ~ "Hemoglobina glicosilada (%)",
+      HbA1c_basal ~ "Hemoglobina glicosilada basal (%)",
+      Edad ~ "Edad (años)",
+      Glucosa ~ "Glucosa (mg/dL)",
+      Escala_Wagner ~ "Escala de Wagner",
+      Referido ~ "Si fue referido o no",
+      Tipo_diabetes ~ "Tipo de Diabetes"
+    )
+  ) |>
+  bold_p(t = 0.05) |>
+  modify_header(estimate = "**HR no ajustado**", p.value = "**Valor P**")
+```
+
+Imprimimos la tabla
+
+```{r}
+tabla_cox
+```
+
+**Conclusión:** En base a los datos presentados en la tabla, se observa que de los factores analizados, solo el sexo femenino se asocia significativamente con un menor riesgo del evento en estudio (p=0.042). Las demás variables, incluyendo la hemoglobina glicosilada (tanto la medida general como la basal), la edad, la glucosa, si el paciente fue referido o no, y el tipo de diabetes (tipo 1, tipo 2 y gestacional), no muestran una asociación estadísticamente significativa con el riesgo del evento. Esto sugiere que el sexo femenino podría ser un factor protector, aunque se requieren estudios adicionales para confirmar esta asociación y explorar posibles mecanismos subyacentes.
