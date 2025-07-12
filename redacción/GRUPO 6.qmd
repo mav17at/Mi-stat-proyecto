@@ -1,0 +1,308 @@
+---
+title: "Grupo 6"
+author: 
+  - "Alarcon Tacson, Maria Victoria"
+  - "Calderon Luque, Naomy Alexandra"
+  - "De la Rosa Olachea, Randa Rosario"
+  - "Del Castillo Uribe, Romina Pierina"
+  - "Muñante Quispe, Enith Margoryt"
+format: html
+editor: visual
+---
+
+# Paquetes para resumir datos
+
+Instalar paquetes
+
+```{r}
+#install.packages("gtsummary")
+#install.packages("finalfit")
+#install.packages("flextable")
+```
+
+Cargar paquetes
+
+```{r}
+library(tidyverse)
+library(here)
+library(rio)
+library(gtsummary) ## Para la "Tabla 1"
+library(finalfit)
+library(flextable)
+```
+
+# Cargando los datos
+
+```{r}
+data_cancer <- import(here("conoc_actit_factor_cancer_cervical.csv"))
+```
+
+### La estructura de los datos
+
+```{r}
+str(data_cancer)
+```
+
+# 1. Resumen de variables categóricas
+
+```{r}
+table(data_cancer$conocimiento, useNA = "ifany")
+```
+
+```{r}
+table(data_cancer$religion, useNA = "ifany")
+```
+
+Con tidyverse
+
+```{r}
+data_cancer |> 
+  dplyr::count(etnia, sort = TRUE)
+```
+
+Valores perdidos en proporciones
+
+```{r}
+prop.table(table(data_cancer$etnia, useNA = "ifany"))
+```
+
+```{r}
+round(prop.table(table(data_cancer$etnia, useNA = "ifany"))*100,2)
+```
+
+# 2. Resumen de variables continuas
+
+```{r}
+mean(data_cancer$edad_relacion_sexual, na.rm = TRUE)
+```
+
+```{r}
+sd(data_cancer$num_hijos, na.rm = TRUE)
+```
+
+```{r}
+min(data_cancer$edad, na.rm = TRUE)    # Valor mínimo
+
+IQR(data_cancer$edad, na.rm = TRUE)    # Rango intercuartílico
+
+median(data_cancer$edad, na.rm = TRUE) # Mediana
+```
+
+### La función `summary()`
+
+```{r}
+summary(data_cancer$num_hijos)
+```
+
+## Mediana y media
+
+```{r}
+mean(data_cancer$edad_relacion_sexual, na.rm = TRUE)
+```
+
+```{r}
+median(data_cancer$edad_relacion_sexual, na.rm = TRUE)
+```
+
+```{r}
+mean(data_cancer$edad, na.rm = TRUE)
+```
+
+```{r}
+median(data_cancer$edad, na.rm = TRUE)
+```
+
+```{r}
+par(mfrow = c(1, 2))  # Configuramos para mostrar dos gráficos lado a lado
+hist(data_cancer$parejas_sex)
+hist(data_cancer$edad)
+```
+
+# Por otra variable
+
+```{r}
+data_cancer |> 
+  group_by(num_hijos) |> 
+  summarise(
+    n_observ = n(),
+    porcentaje = (n_observ / nrow(data_cancer)) * 100
+  )
+```
+
+```{r}
+data_cancer |> 
+  group_by(edad) |> 
+  summarise(promedio = mean(edad_relacion_sexual, na.rm = TRUE))
+```
+
+```{r}
+data_cancer |> 
+  group_by(antec_ets,parejas_sex) |> 
+  summarise(promedio = mean(edad, na.rm = TRUE))
+```
+
+Otros estadísticos
+
+```{r}
+data_cancer |> 
+  group_by(antec_ets, parejas_sex) |> 
+  summarise(
+    promedio_variable = mean(edad, na.rm = TRUE),
+    DE = sd(edad, na.rm = TRUE),
+    max_valor_variable = max(edad, na.rm = TRUE)
+  )
+```
+
+Estadística descriptiva condicional
+
+```{r}
+data_cancer %>%
+  summarise(
+    max_edad_conocimiento_alto = max(ifelse(conocimiento == "alto", edad, NA), na.rm = TRUE),
+    max_edad_conocimiento_medio = max(ifelse(conocimiento == "medio", edad, NA), na.rm = TRUE),
+    max_edad_conocimiento_bajo = max(ifelse(conocimiento == "bajo", edad, NA), na.rm = TRUE),
+    prom_edad_conocimiento_alto = mean(ifelse(conocimiento == "alto", edad, NA), na.rm = TRUE),
+    prom_edad_conocimiento_medio = mean(ifelse(conocimiento == "medio", edad, NA), na.rm = TRUE),
+    prom_edad_conocimiento_bajo = mean(ifelse(conocimiento == "bajo", edad, NA), na.rm = TRUE)
+  )
+```
+
+Percentiles del nivel de número de hijos por grupo de edad solo en participantes con cancer cervical usando la función `filter()`
+
+```{r}
+data_cancer |> 
+  filter(conocimiento == "Si") |> 
+  group_by(num_hijos) |> 
+  summarise(
+    p25 = quantile(edad, probs = 0.25, na.rm = TRUE),
+    p50 = quantile(edad, probs = 0.50, na.rm = TRUE),
+    p75 = quantile(edad, probs = 0.75, na.rm = TRUE)
+  )
+```
+
+```{r}
+data_cancer |> 
+  group_by(conocimiento) |> 
+  summarise(across(
+    .cols = c(edad, num_hijos, parejas_sex),
+    .fns = list(
+      "promedio" = mean,
+      "DE" = sd,
+      "máximo" = max
+    ),
+    na.rm = TRUE
+  ))
+```
+
+```{r}
+data_cancer |> 
+  group_by(conocimiento) |> 
+  summarise(across(
+    .cols = where(is.numeric),
+    .fns = list(
+      "promedio" = mean,
+      "DE" = sd,
+      "máximo" = max
+    ),
+    na.rm = TRUE
+  ))
+```
+
+# La Tabla 1 con gtsummary
+
+```{r}
+#install.packages("finalfit")
+#install.packages("gtsummary")
+```
+
+```{r}
+library(gtsummary)
+```
+
+Tabla 1 básico
+
+```{r}
+data_cancer |> 
+  select(edad, num_hijos, parejas_sex, conocimiento, actitud, practica) |> 
+  tbl_summary()
+```
+
+```{r}
+data_cancer |> 
+  select(edad, num_hijos, parejas_sex, conocimiento, actitud, practica) |> 
+  tbl_summary(
+    by = conocimiento
+  )
+```
+
+## Configurando el estilo e idioma
+
+```{r}
+theme_gtsummary_language(language = "es") # idioma es = español
+theme_gtsummary_journal(journal = "jama")
+```
+
+```{r}
+data_cancer |> 
+  select(edad, num_hijos, parejas_sex, conocimiento, actitud, practica) |> 
+  tbl_summary(
+    by = actitud
+  )
+```
+
+## Recodificación de variables y adición de nombres correctos a variables
+
+```{r}
+data_cancer_0 = data_cancer |> 
+  mutate(
+    edad = ff_label(edad, "Edad (años)"),
+    
+    num_hijos = ff_label(num_hijos, "Número de hijos"),
+    
+    parejas_sex = ff_label(parejas_sex, "Número de parejas sexuales"),
+    
+    conocimiento = as.factor(conocimiento) |> 
+      ff_label("Conocimiento sobre cáncer cervical"),
+    
+    actitud = as.factor(actitud) |> 
+      ff_label("Actitud frente al cáncer cervical"),
+    
+    practica = as.factor(practica) |> 
+      ff_label("Práctica de tamizaje")
+  )
+```
+
+```{r}
+tabla_1_v1 = data_cancer_0 |> 
+  select(edad, num_hijos, parejas_sex, conocimiento, actitud, practica) |> 
+  tbl_summary(by = conocimiento)
+```
+
+Variable dependiente
+
+```{r}
+tabla_1_v2 = data_cancer_0 |> 
+  select(edad, num_hijos, parejas_sex, conocimiento, actitud, practica) |> 
+  tbl_summary(by = conocimiento) |> 
+  modify_spanning_header(all_stat_cols() ~ "**Conocimiento sobre cáncer cervical**") |> 
+  add_overall()
+```
+
+```{r}
+tabla_1 = data_cancer_0 |> 
+  select(edad, num_hijos, parejas_sex, conocimiento, actitud, practica) |> 
+  tbl_summary(by = conocimiento) |> 
+  modify_spanning_header(all_stat_cols() ~ "**Conocimiento sobre cáncer cervical**") |> 
+  add_overall() |> 
+  modify_caption("**Tabla 1**. Características de las pacientes del estudio de cáncer cervical")
+```
+
+```{r}
+install.packages("flextable")
+library(flextable)
+```
+
+```{r}
+tabla_1_flex = as_flex_table(tabla_1)
+save_as_docx(tabla_1_flex, path = "tabla_1_flex.docx")
+```
